@@ -23,3 +23,9 @@ console.log(total);
 }
 ```
 
+```
+input: webpack --> index.js --> webpack--> output: bundle.js
+                                    ^
+                                    |
+                                    webpack config
+ ```
