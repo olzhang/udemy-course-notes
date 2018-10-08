@@ -20,7 +20,7 @@ console.log(total);
 `package.json`
 ```json
 {
-    devDependencies: {
+    'devDependencies': {
         
     }
 }
