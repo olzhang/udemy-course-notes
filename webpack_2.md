@@ -159,9 +159,45 @@ module.exports = config;
 - this is what the `bundle.js` sort of looks like (pseudo code):
 
 ```javascript
-var myModules = []
+var myModules = [
+    function() { // everything inside of sum.js
+        const sum = (a,b) => a+b;
+        return sum;
+    },
+    function() { // everything inside of index.js
+        const sum = myModules[0]();
+        const total = sum(10, 10);
+        console.log(total);
+    }
+];
+
+var entryPointIndex = 1;
+myModules[entryPointIndex]();
+```
+#### Running the App
+to run the `bundle.js` we will have 1 html file that loads the `bundle.js`, we will call this file `index.html`
+```html
+<!-- index.html -->
+<head>
+</head>
+<body>
+    <script type="text/javascript" src="bundle.js" />
+</body>
 ```
 
+#### Intro to Loaders 
+- webpack determines the dependencies of a bunch of modules and orders them
+- module loaders: do some pre-processing before putting modules into `bundle.js`
+- e.g. Babel, images, etc etc
+- First module loader we will look at is Babel
+- Babel transpiles ES6,7,8 to ES5.
+- To be clear:
+    - Babel: transpiles ES6,7,8 to ES5.
+    - Webpack: links up js modules together
+- there's 3 modules we need to get Babel setup:
+    1. babel-loader: Teaches babel how to work with webpack. Babel can work wth dozen build systems, not just webpack. So babel needs to configured to work with webpack.
+    2. babel-core: knows how to take code, parse it, and generate some output file. Babel doesn't
+    3. babel-preset-env: ruleset for telling babel exactly what pieces of es6/7/8 syntax to look for to turn into es5. E.g. 'look at the const keyword, look at the object preset'
+- command: `yarn add --dev babel-loader babel-core babel-preset-env` 
 
 
- 
