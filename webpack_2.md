@@ -78,7 +78,8 @@ console.log(total);
 
 ```javascript
 // src/sum.js
-
+const sum = (a, b) => a+b;
+module.exports = sum 
 ```
 
 `package.json`
@@ -198,6 +199,110 @@ to run the `bundle.js` we will have 1 html file that loads the `bundle.js`, we w
     1. babel-loader: Teaches babel how to work with webpack. Babel can work wth dozen build systems, not just webpack. So babel needs to configured to work with webpack.
     2. babel-core: knows how to take code, parse it, and generate some output file. Babel doesn't
     3. babel-preset-env: ruleset for telling babel exactly what pieces of es6/7/8 syntax to look for to turn into es5. E.g. 'look at the const keyword, look at the object preset'
-- command: `yarn add --dev babel-loader babel-core babel-preset-env` 
+- command: `yarn add --dev babel-loader babel-core babel-preset-env`
+
+#### Babel Setup for ES2015
+- loaders: individual libraries that can run on different files in our project
+- wiring up Babel:
+![Babel Diagram](./babel_setup.png)
+```javascript
+// webpack.config.js
+// webpack will look at this file to get the configurations
+
+// the index.js file is the thing that kicks off our app, so we call it the entry point of our appplication
+
+const config = {
+
+    // 2 minimum properties we have to config:
+    // 1. the entry property: 
+    //    - the index.js file is the file that we run to start our project
+    //    - the index.js is also the one that export anything (i.e. no other file depends on the index.js), so it is the ENTRY FILE
+    //    - webpack would start at the entry file and look at the files that it imports, then look at the other file that those import and so forth. That's how it builds the dependency tree
+
+    entry: './src/index.js',
+    // 2. output property:
+    output: {
+        path: path.resolve(__dirname, 'build'), // HAS TO BE ABSOLUTE PATH. .resolve() creates a path string for any os system
+        
+        // __dirname, build puts the bundle.js in a folder called 'build' in the homedir of our project 
+        
+        filename: 'bundle.js'
+    },
+
+    // 'module' property is new in webpack 2. In webpack 1 these pre-processing steps are called 'loaders', but now each 'loader' is a 'rule' in 'modules'
+    module: {
+        rules: [
+            // inside each rule we have an object to define the rule
+            {
+                use: 'babel-loader', // use defines which loader to use
+                test: /\.js/, // a regex exp that applies the loader (in this case 'babel-loader') to any file that matches the regex
+
+            }
+        ]
+    }
+
+};
+
+module.exports = config;
+```
+
+#### Babel Configuration
+The `.babelrc` file specifies the set of rules to run when you use the babel-loader loader in webpack
+```json
+{
+    "presets": ["babel-preset-env"]
+}
+```
+
+We can now run `npm run build` and get the `bundle.js`
+
+#### Refactor to ES2015 Module
+
+```javascript
+// src/index.js
+import sum from './sum';
+
+const total = sum(10, 5);
+console.log(total);
+```
+
+```javascript
+// src/sum.js
+const sum = (a, b) => a+b;
+
+export default sum;
+```
+
+#### Handling CSS with Webpack
+`css-loader` allows us to import `.css` into our `.js` files
+
+e.g. ![CSS Loader](./loading_css.png)
+
+- the benefit of using webpack to handle css is that it allows us to load css files into our js
+- Note: importing the css does not scope the css to some file. It just shows a relationship between a css file and a js one
+```javascript
+// src/image_viewer.js
+const image = document.createElement('img');
+image.src = 'http://lorempixel.com/400/400';
+
+document.body.appendChild(image);
+
+```
+```javascript
+// src/index.js
+import sum from './sum';
+import './image_viewer.js';
+
+// why do we just do import './image_viewer.js'? without assigning it to a variable? because we are not using it, it's just executing code
+
+const total = sum(10, 5);
+console.log(total);
+
+```
+
+#### The Style and CSS Loaders
+
+```css
+/* styles/ */
 
 
