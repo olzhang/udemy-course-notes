@@ -280,6 +280,7 @@ e.g. ![CSS Loader](./loading_css.png)
 
 - the benefit of using webpack to handle css is that it allows us to load css files into our js
 - Note: importing the css does not scope the css to some file. It just shows a relationship between a css file and a js one
+
 ```javascript
 // src/image_viewer.js
 const image = document.createElement('img');
