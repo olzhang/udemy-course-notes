@@ -323,7 +323,6 @@ const UserType = new GraphQLObjectType({
             type: CompanyType, // <---- THIS IS HOW RELATIONS WORK
             resolve(parentValue, args) {
                 axios.get(`http://localhost:3000/${parentValue.companyId}`).then(res => res.data);
-
                 // this is how relations work. parentValue is the value "parent" type object. In ths case, company is nested in UserType so the parent is the value we fetch back from user
             }
         }
@@ -380,304 +379,391 @@ The `resolve` function is what takes you from one type to another type
 Think about the `resolve` function as edges and the types as nodes
 
 
+#### 20. Multiple RootQuery Endpoints
 
+We cannot direction query for a company like so:
 
- 
-
-myModule
-- With alot of js modules, two issues arise:
-    1. gauranteeing load order (e.g. if index.js relies on utils.js and store.js, how can we make sure that everytime we run the js code, utils.js and store.js loads first before index.js) (i.e. dependency tree)
-    2. have many js files and loading them over http connection is very slow especially on mobile devices
-
-- webpack takes big collection of small js modules and putting them inside one bundle.js .. also handles transpiling es6/7 to es5, css, but those are side effects. This guarentees that:
-    1. load order 
-    2. have only 1 module
-
-#### Webpack in Action
-
-- make 2 js modules and see what webpack does
-- what we are gonna do:
-    1. make npm project
-    2. create 2 js modules
-    3. install and config webpack
-    4. run + inspect webpack output
-
-`package.json`    
-```json
+```javascript
 {
-    "dependencies": {
-
-    }
-}
-```
-```javascript
-// src/index.js
-// index.js calls functions in the sum.js
-// index imports sum, so sum.js needs to LOAD BEFORE index.js
-```
-
-```javascript
-// src/sum.js
-// a utility function for math operations
-const sum = (a, b) => a + b;
-// remember that each js file has it's own scope
-```
-    
-#### Review of JS Modules
-- CommonJS modules: require, module.exports, sync
-- AMD: async module loading
-- ES2015: import
-
-#### Linking Files with CommonJS
-- sum.js has no dependencies
-- index.js needs sum.js 
-
-  
-#### Webpack Installation and Configuration
-
-```
-input: sum.js --> index.js --> webpack--> output: bundle.js
-                                    ^
-                                    |
-                                    webpack.config.js
-```
-
-```javascript
-// src/index.js
-const sum = require('./sum');
-
-const total = sum(10, 5);
-console.log(total);
-```
-
-```javascript
-// src/sum.js
-const sum = (a, b) => a+b;
-module.exports = sum 
-```
-
-`package.json`
-```json
-{
-    "devDependencies": {
-        
+    company(id: "1") {
+        name
     }
 }
 ```
 
-```javascript
-// webpack.config.js
-// webpack will look at this file to get the configurations
+This is because we do not have the company on our root query
 
-// the index.js file is the thing that kicks off our app, so we call it the entry point of our appplication
-
-const config = {
-
-    // 2 minimum properties we have to config:
-    // 1. the entry property: 
-    //    - the index.js file is the file that we run to start our project
-    //    - the index.js is also the one that export anything (i.e. no other file depends on the index.js), so it is the ENTRY FILE
-    //    - webpack would start at the entry file and look at the files that it imports, then look at the other file that those import and so forth. That's how it builds the dependency tree
-
-    entry: './src/index.js'
-
-};
-
-module.exports = config;
-```
-
-#### More on Webpack Configuration
+So, let's instantiate companies in the root query like so:
 
 ```javascript
-const path = require('path');
-
-const config = {
-    // 2 minimum properties we have to config:
-    // 1. the entry property: 
-    //    - the index.js file is the file that we run to start our project
-    //    - the index.js is also the one that export anything (i.e. no other file depends on the index.js), so it is the ENTRY FILE
-    //    - webpack would start at the entry file and look at the files that it imports, then look at the other file that those import and so forth. That's how it builds the dependency tree
-
-    entry: './src/index.js',
-
-    // 2. output property:
-    output: {
-        path: path.resolve(__dirname, 'build'), // HAS TO BE ABSOLUTE PATH. .resolve() creates a path string for any os system
-        
-        // __dirname, build puts the bundle.js in a folder called 'build' in the homedir of our project 
-        
-        filename: 'bundle.js'
-    }
-};
-module.exports = config;
-```
-#### Running Webpack
-
-`package.json`
-```json
-{
-    "scripts": {
-        "build": "webpack"
-    },
-    "devDependencies": {
-        "webpack": "^2.2.0-rc.0"
-    }
-}
-```
-
-- why would we make a script to run just one command?
-    - because when we set the command 'webpack' to 'npm run build', it will run the webpack installed inside the project. else it would run the global webpack
-- run `npm run build`. Notice that the output bundle.js is always much larger than the source files that it built
-
-#### The Bundle.js File
-
-- this is what the `bundle.js` sort of looks like (pseudo code):
-
-```javascript
-var myModules = [
-    function() { // everything inside of sum.js
-        const sum = (a,b) => a+b;
-        return sum;
-    },
-    function() { // everything inside of index.js
-        const sum = myModules[0]();
-        const total = sum(10, 10);
-        console.log(total);
-    }
-];
-
-var entryPointIndex = 1;
-myModules[entryPointIndex]();
-```
-#### Running the App
-to run the `bundle.js` we will have 1 html file that loads the `bundle.js`, we will call this file `index.html`
-```html
-<!-- index.html -->
-<head>
-</head>
-<body>
-    <script type="text/javascript" src="bundle.js" />
-</body>
-```
-
-#### Intro to Loaders 
-- webpack determines the dependencies of a bunch of modules and orders them
-- module loaders: do some pre-processing before putting modules into `bundle.js`
-- e.g. Babel, images, etc etc
-- First module loader we will look at is Babel
-- Babel transpiles ES6,7,8 to ES5.
-- To be clear:
-    - Babel: transpiles ES6,7,8 to ES5.
-    - Webpack: links up js modules together
-- there's 3 modules we need to get Babel setup:
-    1. babel-loader: Teaches babel how to work with webpack. Babel can work wth dozen build systems, not just webpack. So babel needs to configured to work with webpack.
-    2. babel-core: knows how to take code, parse it, and generate some output file. Babel doesn't
-    3. babel-preset-env: ruleset for telling babel exactly what pieces of es6/7/8 syntax to look for to turn into es5. E.g. 'look at the const keyword, look at the object preset'
-- command: `yarn add --dev babel-loader babel-core babel-preset-env`
-
-#### Babel Setup for ES2015
-- loaders: individual libraries that can run on different files in our project
-- wiring up Babel:
-![Babel Diagram](./babel_setup.png)
-```javascript
-// webpack.config.js
-// webpack will look at this file to get the configurations
-
-// the index.js file is the thing that kicks off our app, so we call it the entry point of our appplication
-
-const config = {
-
-    // 2 minimum properties we have to config:
-    // 1. the entry property: 
-    //    - the index.js file is the file that we run to start our project
-    //    - the index.js is also the one that export anything (i.e. no other file depends on the index.js), so it is the ENTRY FILE
-    //    - webpack would start at the entry file and look at the files that it imports, then look at the other file that those import and so forth. That's how it builds the dependency tree
-
-    entry: './src/index.js',
-    // 2. output property:
-    output: {
-        path: path.resolve(__dirname, 'build'), // HAS TO BE ABSOLUTE PATH. .resolve() creates a path string for any os system
-        
-        // __dirname, build puts the bundle.js in a folder called 'build' in the homedir of our project 
-        
-        filename: 'bundle.js'
-    },
-
-    // 'module' property is new in webpack 2. In webpack 1 these pre-processing steps are called 'loaders', but now each 'loader' is a 'rule' in 'modules'
-    module: {
-        rules: [
-            // inside each rule we have an object to define the rule
-            {
-                use: 'babel-loader', // use defines which loader to use
-                test: /\.js/, // a regex exp that applies the loader (in this case 'babel-loader') to any file that matches the regex
-
+const RootQuery = new GraphQLObjectType({
+    name: 'RootQueryType',
+    fields: {
+        user: {
+            type: UserType,
+            args: { id: { type: GraphQLString }},
+            resolve(parentValue, args) {
+                // resolve function allows us to return data from the query
+                // Returns th
+                // return find(users, { id: args.id })
+                return axios.get(`http://localhost:3000/users/${args.id}`).then(res => res.data)
             }
-        ]
+        },
+        company: {
+            type: CompanyType,
+            args: { id: { type: GraphQLString }},
+            resolve(parentValue, args) {
+                return axios.get(`http://localhost:3000/companies/${args.id}`).then(res => res.data)
+            } 
+        }
     }
-
-};
-
-module.exports = config;
+})
 ```
 
-#### Babel Configuration
-The `.babelrc` file specifies the set of rules to run when you use the babel-loader loader in webpack
-```json
+#### 21. Bidirectional Relations & 22. More On Bidirectional Relationships & 23. Resolving Circular References
+
+ Right now we cannot query for all the employees that work for a company, but we can query for all the companies that a user works for.
+
+So we can do like so:
+
+```javascript
+const CompanyType = new GraphQLObjectType({
+    name: 'Company',
+    // all the different props that a user has
+    fields: {
+        id: { type: GraphQLString },
+        name: { type: GraphQLString },
+        description: { type: GraphQLString },
+        users: {
+            type: GraphQLList(UserType),
+            resolve(parentValue, args) {
+                return axios.get(
+                    `http://localhost:3000/companies/${parentValue.id}/users`
+                ).then(
+                    res => res.data
+                )
+            }
+        }
+    }
+});
+
+const UserType = new GraphQLObjectType({
+    name: 'User',
+    // all the different props that a user has
+    fields: {
+        id: { type: GraphQLString },
+        firstName: { type: GraphQLString },
+        age: { type: GraphQLInt },
+        company: {
+            type: CompanyType, // <---- THIS IS HOW RELATIONS WORK
+            resolve(parentValue, args) {
+                axios.get(`http://localhost:3000/${parentValue.companyId}`).then(res => res.data);
+
+                // this is how relations work. parentValue is the value "parent" type object. In ths case, company is nested in UserType so the parent is the value we fetch back from user
+            }
+        }
+    }
+});
+```
+The above code should enable us to get a list of users that work for a company  but it gives us UserType is not defined, that's because UserType is defined farther down in the code but we are using it already, HOWEVER if we move UserType to the top, it wouldn't work out because we are using CompanyType in UserType, this is a Circular Reference Issue. We can fix this by returning the `fields` property in a function as below
+
+```javascript
+const CompanyType = new GraphQLObjectType({
+    name: 'Company',
+    //  fields is now a function
+    fields: () => ({
+        id: { type: GraphQLString },
+        name: { type: GraphQLString },
+        description: { type: GraphQLString },
+        users: {
+            type: GraphQLList(UserType),
+            resolve(parentValue, args) {
+                return axios.get(
+                    `http://localhost:3000/companies/${parentValue.id}/users`
+                ).then(
+                    res => res.data
+                )
+            }
+        }
+    })
+});
+
+const UserType = new GraphQLObjectType({
+    name: 'User',
+    fields: () => ({
+        id: { type: GraphQLString },
+        firstName: { type: GraphQLString },
+        age: { type: GraphQLInt },
+        company: {
+            type: CompanyType,
+            resolve(parentValue, args) {
+                return axios.get(`http://localhost:3000/${parentValue.companyId}`).then(res => res.data);
+            }
+        }
+    })
+});
+```
+
+This enables us to do circular referencing:
+
+```javascript
 {
-    "presets": ["babel-preset-env"]
+    company(id: "1") {
+        name,
+        users: {
+            firstName,
+            age,
+            company: {
+                name,
+                users: {
+                    firstName,
+                    age
+                }
+            }
+        }
+    }
 }
 ```
 
-We can now run `npm run build` and get the `bundle.js`
+Here we ae asking for the list of users that work for the company, then their age and the company that they work for (which is the first company that we asked for), and the users ... 
 
-#### Refactor to ES2015 Module
+
+#### 24. Query Fragments
+
+we can name our queries like so:
 
 ```javascript
-// src/index.js
-import sum from './sum';
+query findCompany {
+    company(id: "1") {
+        name,
+        description
+    }
+}
+```
 
-const total = sum(10, 5);
-console.log(total);
+I can ask for multiple companies in 1 query:
+
+```javascript
+{
+    company(id: "1") {
+        name,
+        description
+    }
+    company(id: "2") {
+        name,
+        description
+    }
+}
+````
+
+I cannot do the above because the query key `company` is duplicated. The result that I get back uses the query key (in this case `company`) as the field in the json response. Instead I have to do something like this:
+
+```javascript
+{
+    apple: company(id: "1") {
+        name,
+        description
+    }
+    google: company(id: "2") {
+        name,
+        description
+    }
+}
+````
+Now `apple` and `google` will be used as fields for the data that I get back
+
+We can also define query fragments like so:
+
+```javascript
+{
+    apple: company(id: "1") {
+        ...companyDetails
+    }
+    google: company(id: "2") {
+        ...companyDetails
+    }
+}
+
+fragment companyDetails on Company {
+    name,
+    description
+}
+````
+
+#### 25. Introduction to Mutations & 26. NonNull Fields and Mutations
+
+There will be a "Mutations" object like the "RootQuery" that we define to mutate the data
+
+![Mutation Structure](./mutation_structure.png)
+
+```javascript
+const mutation = new GraphQLObjectType({
+    name: 'Mutation':
+    fields: {
+        addUser: {
+            type: UserType,
+            // args will be the parameters that we pass in to add a new user . It makes sense that 
+            // the new user should have an age and a first name but not necessarily a  company. So we can use GraphQLNonNull 
+            args: { 
+                firstName: { type: new GraphQLNonNull(GraphQLString) },
+                age: { type: new GraphQLNonNull(GraphQLInt) },
+                companyId: { type: GraphQLString }
+            },
+            // the resolve function will return the data that we expect to get back after the mutation
+            // sometimes, it will not be the same as the type that we are sending in
+            resolve(parentValue, args) {
+                return axios.post(
+                    `http://localhost:3000/users`, { firstName, age }
+                ).then(
+                    res => res.data
+                ) 
+            }
+        }
+    }
+})
+```
+
+To use this definition we can:
+
+```javascript
+mutation {
+    addUser(firstName: "Test26", age: 29) {
+        id,
+        firstName,
+        age
+    }
+}
+```
+#### 27. Do it Yourself, Delete Mutations
+
+```javascript
+const mutation = new GraphQLObjectType({
+    name: 'Mutation':
+    fields: {
+        addUser: {
+            type: UserType, //  type is the type that you expect to be returned
+            // args will be the parameters that we pass in to add a new user . It makes sense that 
+            // the new user should have an age and a first name but not necessarily a  company. So we can use GraphQLNonNull 
+            args: { 
+                firstName: { type: new GraphQLNonNull(GraphQLString) },
+                age: { type: new GraphQLNonNull(GraphQLInt) },
+                companyId: { type: GraphQLString }
+            },
+            // the resolve function will return the data that we expect to get back after the mutation
+            // sometimes, it will not be the same as the type that we are sending in
+            resolve(parentValue, args) {
+                return axios.post(
+                    `http://localhost:3000/users`, { firstName, age }
+                ).then(
+                    res => res.data
+                ) 
+            }
+        },
+        deleteUser: {
+            type: UserType, //  type is the type that you expect to be returned
+            args: {
+                userId: { type: new GraphQLNonNull(GraphQLString) }
+            },
+            resolve(parentValue, args) {
+                return axios.delete(
+                    `http://localhost:3000/users/${args.id}`
+                ).then(
+                    res => res.data
+                )
+            }
+        }
+    }
+})
+```
+we can call it like so:
+
+```javascript
+mutation {
+    deleteUser(id: "23") {
+        id
+    }
+}
+```
+
+But in the current implementation of the json server, we do not return anything when we perform a delete 
+
+Note Put vs Patch difference: a Put replaces the entirety of a existing record. A Patch only replaces specific fields of a given record as specified in the body
+
+
+![Put Vs Patch](./put_vs_patch.png)
+
+
+#### 28. Do it yourself - Edit Mutations
+
+```javascript
+const mutation = new GraphQLObjectType({
+    name: 'Mutation':
+    fields: {
+        addUser: {
+            type: UserType, //  type is the type that you expect to be returned
+            // args will be the parameters that we pass in to add a new user . It makes sense that 
+            // the new user should have an age and a first name but not necessarily a  company. So we can use GraphQLNonNull 
+            args: { 
+                firstName: { type: new GraphQLNonNull(GraphQLString) },
+                age: { type: new GraphQLNonNull(GraphQLInt) },
+                companyId: { type: GraphQLString }
+            },
+            // the resolve function will return the data that we expect to get back after the mutation
+            // sometimes, it will not be the same as the type that we are sending in
+            resolve(parentValue, args) {
+                return axios.post(
+                    `http://localhost:3000/users`, { firstName, age }
+                ).then(
+                    res => res.data
+                ) 
+            }
+        },
+        deleteUser: {
+            type: UserType, //  type is the type that you expect to be returned
+            args: {
+                id: { type: new GraphQLNonNull(GraphQLString) }
+            },
+            resolve(parentValue, args) {
+                return axios.delete(
+                    `http://localhost:3000/users/${args.id}`
+                ).then(
+                    res => res.data
+                )
+            }
+        }
+    },
+
+    editUser: {
+        type: UserType,
+        args: {
+            id: { type: new GraphQLNonNull(GraphQLString) },
+            firstName: { type: GraphQLString },
+            age: { type: GraphQLInt },
+            companyId: { type: GraphQLString }
+        },
+        resolve(parentValue, args) {
+            return axios.delete(
+                `http://localhost:3000/users/${args.id}`, args 
+                //note that in the args body there is already an id field
+                // so if we pass in an id in the url and an id in the args would it possibly conflict?
+                // No, because json-server ignores duplicate ids
+            ).then(
+                res => res.data
+            )
+        }
+    }
+})
 ```
 
 ```javascript
-// src/sum.js
-const sum = (a, b) => a+b;
-
-export default sum;
-```
-
-#### Handling CSS with Webpack
-`css-loader` allows us to import `.css` into our `.js` files
-
-e.g. ![CSS Loader](./loading_css.png)
-
-- the benefit of using webpack to handle css is that it allows us to load css files into our js
-- Note: importing the css does not scope the css to some file. It just shows a relationship between a css file and a js one
-
-```javascript
-// src/image_viewer.js
-const image = document.createElement('img');
-image.src = 'http://lorempixel.com/400/400';
-
-document.body.appendChild(image);
-
-```
-```javascript
-// src/index.js
-import sum from './sum';
-import './image_viewer.js';
-
-// why do we just do import './image_viewer.js'? without assigning it to a variable? because we are not using it, it's just executing code
-
-const total = sum(10, 5);
-console.log(total);
 
 ```
 
-#### The Style and CSS Loaders
 
-```css
-/* styles/ */
+
+
+
+
+
 
 
