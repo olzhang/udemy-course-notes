@@ -227,7 +227,7 @@ module.exports = RootSchema;
 ![User To Companies](./user_companies.png)
 
 
-### SECTION 3: FETCHING DATA WITH QUERIES
+### SECTION 4: FETCHING DATA WITH QUERIES
 
 #### 17. Nested Queries
 
@@ -687,13 +687,13 @@ mutation {
 
 But in the current implementation of the json server, we do not return anything when we perform a delete 
 
+
+#### 28. Do it yourself - Edit Mutations
+
 Note Put vs Patch difference: a Put replaces the entirety of a existing record. A Patch only replaces specific fields of a given record as specified in the body
 
 
 ![Put Vs Patch](./put_vs_patch.png)
-
-
-#### 28. Do it yourself - Edit Mutations
 
 ```javascript
 const mutation = new GraphQLObjectType({
@@ -742,7 +742,7 @@ const mutation = new GraphQLObjectType({
             companyId: { type: GraphQLString }
         },
         resolve(parentValue, args) {
-            return axios.delete(
+            return axios.patch(
                 `http://localhost:3000/users/${args.id}`, args 
                 //note that in the args body there is already an id field
                 // so if we pass in an id in the url and an id in the args would it possibly conflict?
@@ -756,14 +756,281 @@ const mutation = new GraphQLObjectType({
 ```
 
 ```javascript
-
+mutation {
+    editUser(id: "40", age: 10) {
+        id,
+        firstName,
+        age
+        // thiis get resolved 
+    }
+}
 ```
 
 
+#### 29. Relay vs Apollo
+
+![Refresher on Queries](./graphql_structure.png)
+
+What does the request payload look like in GraphQL 
+
+```javascript
+{
+    user(id: 49) {
+        firstName
+    }
+}
+````
+
+It's a POST request:
+
+![post request](./post_body.png)
+
+It's just a string that we pass in. It takes `{ operationName, query: variables: }`
+
+![React Library Comparisons](./react_graphql_comparisons.png)
+
+Lakka - very easy to use, Apollo - very easy to use, opinionated, Relay - very hard, but very versatile
 
 
+#### 30. Apollo Server vs GraphQL Server 
+
+![GraphQL vs Apollo](./graphql_vs_apollo.png)
+
+Apollo will change very fast vs standard GraphQL 
+
+Apollo moves resolver and types in 2 seperate files while GraphQL has the resolver and type in 1 object
 
 
+### SECTION 6: CLIENTSIDE GRAPHQL
+
+#### 31. The Next App
+
+`https://github.com/StephenGrider/Lyrical-GraphQL`
 
 
+#### 32. Starter Pack Walkthrough
+
+This will be a crowdsource song writing website where user can click on a song and add single lines of lyrics to it
+
+![UI](./ui_lyric_project.png)
+
+![Architecture](./ui_project_architecture.png)
+
+#### 34. Mongolab Setup
+
+#### 35. Walking Through the Schema
+
+Docs tab automatically generate docs for the GraphQL schemas that are available to you on your project
+
+Let's create a mutation to add a song
+
+```javascript
+mutation {
+    addSong(title: "Cold Night"): {
+        id
+    }
+}
+```
+
+I get back something like
+
+```json
+{ 
+    "data": {
+        "addSong": {
+            "id": "547657acchgfyt865"
+        }
+    }
+}
+```
+Let's add some lyrics ..
+
+```javascript
+mutation {
+    addLyric(id: "547657acchgfyt865", content: "it's a cold night"): {
+        id // <-- this is the ID of the song we modofied, not the lyric that was created
+    }
+}
+```
+
+I get back something like
+
+```json
+{ 
+    "data": {
+        "addLyric": {
+            "id": "547657acchgfyt865"
+        }
+    }
+}
+```
+
+If I query for the whole song I get something like:
+
+```javascript
+{
+    song(id: "547657acchgfyt865"): {
+        id,
+        title,
+        lyrics
+    }
+}
+```
+
+```json
+{ 
+    "data": {
+        "song": {
+            "id": "547657acchgfyt865",
+            "title": "its a cold night",
+            "lyrics": [
+                { "content": "it's a cold night"}
+            ]
+        }
+    }
+}
+```
+
+#### 36. Apollo Client Setup
+
+![Apollo Architecture](./client_side_architecture.png)
+
+In between the graphql server and react app is the Apollo Store is what is going to communicate with the GraphQL Server and saves data that comes back from GraphQL. The Apollo Provider is the integration layer between the Apollo Store and react app.
+
+
+client/index.js
+
+```javascript
+import React from 'react';
+import ReactDOM from 'react-dom';
+import ApolloClient from 'apollo-client';
+import { ApolloProvider } from 'react-apollo';
+
+const client = new ApolloClient({}); // this is frontend library agnostic, irt doesn't care if you are using Vue, React, or Angular
+
+const Root = () => {
+  return (
+    // ApolloProvider moves data from apollo store to the react code
+    <ApolloProvider client={client}>
+        <div>Lyrical</div>
+    </ApolloProvider>
+  );
+};
+
+ReactDOM.render(
+  <Root />,
+  document.querySelector('#root')
+);
+````
+
+#### 37. React Component Design
+
+![UI](./ui_lyric_project.png)
+
+We have the SongList, SongDetail, and LyricList, and LyricCreate
+
+Let's start with `SongList.js`
+
+client/components/SongList.js
+```javascript
+import React, { Component } from 'react';
+
+class SongList extends Component {
+
+  render() {
+    return (
+      <div>
+        SongList
+      </div>
+    );
+  }
+}
+
+export default SongList;
+
+````
+
+#### 38. GQL Queries in React & 39. Bonding Queries with Components & 40. Handling Pending Queries & 41. Fixing Key Warnings
+
+![](./graphql_react_design_process.png)
+
+Using this for the SongList.js
+
+_GraphQL + React Strategy_
+
+1. Identify the Data Required -- we are gonna need the title of the song
+2. Write the Query in Graphiql
+```javascript
+    { 
+        song {
+            title
+        }
+    }
+````
+3. Bond the query and the client -- GraphQL is not valid JS code, so we need `graphql-tag`
+
+client/components/SongList.js
+```javascript
+import React, { Component } from 'react';
+import gql from 'graphql-tag';
+import { graphql } from 'react-apollo';
+
+class SongList extends Component {
+
+  renderSongs() {
+    // keep in mind that data is undefined at first because data has not been fetched by graphql upon initial render
+    return this.props.data.songs.map(({ id, title }) => {
+      return (
+        <li key={id}>
+            {title}
+        </li>
+      );
+    });
+  }
+
+  render() {
+    // we can see the results in
+    console.log(this.props);
+
+    // Notice the "loading" attribute .. we can use that to determine whether or not gql is finished
+    if(this.props.data.loading) { return <div>Loading ...</div>}
+    
+    return (
+      <div>
+        {this.renderSongs()}
+      </div>
+    );
+  }
+}
+
+//defines the query
+const query = gql`
+    { 
+        song {
+            title
+        }
+
+    }
+`;
+
+// we now need to bind the companent in graphql
+
+export default graphql(query)(SongList);
+
+````
+
+![](./component_render_lifecycle.png)
+
+When the component is rendered it will execute the query and then the query will take sometime to execute before the component is rerendered with the data received. So the component gets rendered twice. The resuts of the query is saved to the `props`
+
+The props look like this with the data inside `props.data.[graphql object name in this case songs]`
+
+![](./props_graphql.png)
+
+Notice the "loading" attribute .. we can use that to determine whether or not gql is finished
+
+
+#### 42. Architecture Review
+
+Note that we typically try to centralize the query to a root component, which is SongList in this case and then pass the props down (BUT wouldn't you need to cause unecessary rerender??)
 
