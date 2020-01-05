@@ -1,0 +1,25 @@
+version: "3"
+services:
+  web:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    image: frontend_web_dev
+    ports:
+      - 1234:1234
+    volumes:
+      - /app/node_modules
+      - ./:/app
+  tests:
+    image: frontend_web_dev
+    volumes:
+      - /app/node_modules
+      - ./:/app
+    command: "npm run test"
+  prod:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.prod
+    ports:
+      - 80:80
+    image: frontend_web_prod

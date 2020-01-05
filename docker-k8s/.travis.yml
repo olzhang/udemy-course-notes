@@ -1,0 +1,22 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  - docker build -t oliver/docker-k8s-test -f Dockerfile.dev . 
+
+script:
+  - docker run oliver/docker-k8s-test npm run test -- --coverage
+
+deploy:
+  provider: elasticbeanstalk
+  region: "us-east-1"
+  app: "docker-k8s-test"
+  env: "docker-k8s-test-env"
+  bucket_name: "elasticbeanstalk-us-west-2-somebucketid"
+  bucket_path: "docker-k8s-test"
+  on:
+    branch: master
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key:
+    secure: "$AWS_SECRET_KEY" 

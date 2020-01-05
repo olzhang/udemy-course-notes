@@ -1,0 +1,36 @@
+version: "3"
+
+services:
+  postgres:
+    image: "postgres:latest"
+  redis:
+    image: "redis:latest"
+  server:
+    build:
+      dockerfile: "Dockerfile.dev"
+      context: "./server"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_POST=6379
+      - PGUSER=postgres
+      - PGPASSWORD=postgres_password
+      - PGDATABASE=postgres
+      - PGHOST=postgres
+      - PGPORT=5432
+    volumes:
+      - /app/node_modules #prevents node_modules from beieng overridden
+      - ./server:/app
+  client:
+    build:
+      dockerfile: "Dockerfile.dev"
+      context: "./client"
+    volumes:
+      - /app/node_modules #prevents node_modules from beieng overridden
+      - ./client:/app
+  worker:
+    build:
+      dockerfile: "Dockerfile.dev"
+      context: "./worker"
+    volumes:
+      - /app/node_modules #prevents node_modules from beieng overridden
+      - ./worker:/app
