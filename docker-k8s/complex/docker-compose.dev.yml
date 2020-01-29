@@ -5,7 +5,14 @@ services:
     image: "postgres:latest"
   redis:
     image: "redis:latest"
-  server:
+  nginx:
+    build:
+      context: "./nginx"
+      dockerfile: "Dockerfile.dev"
+    restart: "always"
+    ports:
+      - "80:80"
+  api:
     build:
       dockerfile: "Dockerfile.dev"
       context: "./server"

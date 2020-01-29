@@ -830,11 +830,51 @@ Refer to code ....
 
 ![](./docker_compose_yml_structure.png)
 
-126. Environment Variables with Docker Compose
+### 126. Environment Variables with Docker Compose
 
 ![](./env_var_syntax_dockercompose.png)
 
 Note that we can specify env vars using the DOCKER_HOSTS's env var
+
+### 127. Nginx Path Routing
+
+![](./nginx_complex.png)
+
+![](./nginx_routing_api.png)
+
+We need to stand up a nginx container to route the client request to the right services. Requests `/api` from the client needs to go to the express server and the static requests go to react server
+
+
+### 129. Routing with Nginx
+
+![](./nginx_conf.png)
+
+```
+upstream client {
+  server client:3000;
+}
+
+upstream api {
+  server api:5000;
+}
+
+server {
+  listen 80;
+
+  location / {
+    proxy_pass: http://client;
+  }
+
+  location /api {
+    rewrite /api/(.*) /$1 break; # rewrites the /api from the client to just end in /
+    proxy_pass http://api;
+  }
+}
+
+```
+
+### 134. Opening Websocket Connections
+ 
 
 
 
