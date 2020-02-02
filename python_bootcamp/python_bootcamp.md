@@ -150,7 +150,6 @@ yields
 ```
 We can use teh `zip` function to do the opposite
 
-
 ### 37. List Comprehensions in Python
 
 [List Comprehension](http://localhost:8888/lab/tree/udemy-course-notes/python_bootcamp/notebooks/02-Python%20Statements/06-List%20Comprehensions.ipynb)
