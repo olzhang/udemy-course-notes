@@ -1,0 +1,1155 @@
+V8 ENGINE
+    
+    Adding JS Features
+        - js => v8 => machine
+        - but you can embed v8 into any c++ program so that any c++ can interpret js according to ecma standard. This allows c++ programs to further augment js to handle more than just what the ecma specifies 
+
+NODE CORE
+
+    Node Versions
+        - node js used to be 0.xx.xx but some people were not happy with the way it was being updated so io.js was born, which consumed and pushed more cutting edge features while nodejs stayed more stable. then they merged together again so that's why node jumoed from 0.12.x to 4.x.x 
+
+MODULES, EXPORTS AND REQUIRE
+
+    MODULES - a reusable block of code whose existance doesn't impact other code accidentally. Allows you to use code modularly
+
+    COMMONJS MODULES - a standard implemented by nodejs for how MODULES should be structured 
+
+    Function Programming 
+        - first class functions: functions that can be passed around like variables 
+        - function expression: excpression that returns a function
+        - makes modules possible
+
+    Let's build a module
+
+        greet.js
+        ------------------------------------------------------------------------------
+
+            console.log('hello');
+
+            var greet = function(greeting) { console.log('hello'); }
+
+            // to make greet available we have to do this to expose greet:
+
+            modules.export = greet; // <-- note that when breaking at this point:
+                                    //      - we have module, require, __dirname, __filename
+
+        ------------------------------------------------------------------------------
+
+        app.js
+        ------------------------------------------------------------------------------
+
+            require('./greet.js');
+
+            //does this work?? No, because app can't grab things inside a module
+            greet();
+
+            // with module.exports, this works:
+
+            var greet = require('./greet');
+
+            greet();
+
+        ------------------------------------------------------------------------------
+
+
+
+    How do Modules Work?
+        - require function:
+        - all js files are transformed into a module object when nodejs executes them
+        - the require is a method inside the module object that allows it to execute other modules (other js files) and return the value of module.exports of the other modules.
+
+        - note that the .load function uses an Module.__extensions object with contains 3 functions: node, js, and json, which each represent a function to interpret the corresponding files with the file extensions (e.g. the js function interps files that end in js)
+
+        loader.js
+        ------------------------------------------------------------------------------
+
+            Module.prototype.require = function(id) {
+
+                ......
+
+                return Module._load(id, this, /* isMain */ false);
+
+                .....
+            };
+
+
+            Module._load = function(request, parent, isMain) {
+
+                ....
+
+                tryModuleLoad(module, filename);
+
+                return module.exports; // RETURNS THE MODULE.EXPORTS OF THE FILE YOU CALLED (E.G. GREET.JS)
+            };
+
+            function tryModuleLoad(module, filename) {
+                ......
+                try {
+                    module.load(filename);
+                    threw = false;
+                } finally { .... }
+            }
+
+
+            Module.prototype.load = function(filename) {
+                
+                ........
+
+                var extension = path.extname(filename) || ".js";
+                if (!Module._extensions[extension]) extension = ".js";
+                Module._extensions[extension](this, filename);  // for js runs the js function
+                this.loaded = true;
+
+                ........
+            };
+
+            // Native extension for .js
+            Module._extensions['.js'] = function(module, filename) {
+
+                var content = fs.readFileSync(filename, 'utf8'); //REQUIRE IS SYNC 
+                module._compile(stripBOM(content), filename);
+            
+            };
+
+            
+            Module.prototype._compile = function(content, filename) {
+                // content = stripShebang(content);
+
+                // create wrapper function
+                var wrapper = Module.wrap(content); // does the wrapping specified below!!
+
+                // vm = V8 engine
+                var compiledWrapper = vm.runInThisContext(wrapper, {
+                    filename: filename,
+                    lineOffset: 0,
+                    displayErrors: true
+                });
+
+                result = compiledWrapper.call(this.exports, this.exports, require, this,
+                                  filename, dirname);
+                return result;
+
+            };
+
+        ------------------------------------------------------------------------------
+
+
+        - in the case of greet.js:
+
+        greet.js is wrapped in a function like so:
+
+            (function(exports, require, module, __filename, __dirname) {
+                // body of greet.js
+
+            });
+
+            fn(module.exports, require, module, filename, dirname);
+
+            return module.exports // the same module.exports that is passed into the function
+
+        - require can also read json!
+
+
+    MODULE PATTERNS
+
+        greet1.js
+        ------------------------------------------------------------------------------
+
+            // replaced exports with a function
+            module.exports = function() {
+                console.log('hi');
+            }
+
+        ------------------------------------------------------------------------------
+
+        greet2.js
+        ------------------------------------------------------------------------------
+
+            // add a method to exports called greet
+
+            module.exports.greet = function() {
+                console.log('hi');
+            }
+
+        -------------------------------------------------------------------------------
+
+        greet3.js
+        ------------------------------------------------------------------------------
+
+            // add a method to exports called greet
+
+            function Greetr() {
+                this.greeting = 'hi';
+                this.greet = function() { console.log(this.greeting); };
+            }
+
+            module.exports = new Greetr();
+
+        -------------------------------------------------------------------------------
+
+
+        greet4.js
+        ------------------------------------------------------------------------------
+
+            // add a method to exports called greet
+
+            function Greetr() {
+                this.greeting = 'hi';
+                this.greet = function() { console.log(this.greeting); };
+            }
+
+            module.exports = Greetr; //allows for creating of a new object 
+
+        -------------------------------------------------------------------------------
+
+        greet5.js
+        ------------------------------------------------------------------------------
+
+            // add a method to exports called greet
+
+            // revealing module pattern: where we expose only what we want in the exports
+
+            function greet() {
+                console.log(greeting);
+            }
+
+            var greeting = 'hello world'; // this is not revealed to the requirer
+
+            module.exports = {
+                greet: greet
+            }
+
+        -------------------------------------------------------------------------------
+
+        app.js
+        ------------------------------------------------------------------------------
+
+            var greet1 = require('./greet1.js');
+            greet1(); //just execs the function
+
+            var greet2 = require('./greet2');
+            greet2.greet() // runs the 
+
+            var greet3 = require('./greet3') //gets new object created from greet3
+            greet3.greeting = "new hello world"
+
+            // what happens here?
+            var greet3b = require('./greet3');
+            greet3b.greet();  // logs "new hello world" // why??? shouldn't it be 'hi'
+
+            //because require cached the module it require, so if you require something more than once in app.js, it retrieves from cache
+
+            var greet4 = require('./greet4');
+            var grtr = new greet4(); //greet4 === Greetr
+
+            var greet5 = require('./greet5');
+            greet5.greet();
+
+        ------------------------------------------------------------------------------
+
+    Exports vs Module.Exports
+
+        ------------------------------------------------------------------------------
+
+            (function(exports, require, module, __filename, __dirname) {
+                // body of greet.js
+            });
+            fn(module.exports, require, module, filename, dirname);
+
+        ------------------------------------------------------------------------------
+
+        - in the above code exports and module.exports are the same thing, so why do we use module.exports instead of exports?
+            - require returns the module.exports on the module object, not the exports variable
+                - but `exports` and `module.exports` point to the same object ....
+                - there is a quirk in js's pass by reference with objects such thata refering to the exports variable will not always work:
+                
+        greet.js
+        ------------------------------------------------------------------------------
+
+            exports = function() { console.log('hi'); }
+            
+            console.log(exports) // logs [Function]
+            console.log(module.exports); // logs {} why???
+
+            /*
+                exports and module.exports pointed at the same spot, but since we assigned exports to a new function, it now points to a function instead of the same object at module.exports. However, module.exports is the reference returned from require, not exports.
+            */
+
+        -------------------------------------------------------------------------------
+
+        greet2.js
+        ------------------------------------------------------------------------------
+
+            // we can mutate exports (i.e. add properties to the exports object and those properties will also be in module.exports since they point to the same object)
+
+            exports.greet = function() { console.log('hi'); }
+            
+            console.log(exports) // logs { greet: [Function] }
+            console.log(module.exports); // logs { greet: [Function] }           
+
+        -------------------------------------------------------------------------------
+
+        app.js
+        ------------------------------------------------------------------------------
+            var greet1 = require('./greet.js');
+            greet1(); // error
+
+            var greet2 = require('./greet2');
+            greet2.greet(); // logs 'hi'
+            
+        ------------------------------------------------------------------------------
+
+
+    Requiring Native & Core Modules
+
+        - reuire checks for native modules 
+        - e.g. var util = require('util')
+
+
+    Modules and ES6
+        - now es6 and v8 engine has features for natively supporting module imports instead of using node's require ..
+        - since node uses v8, node also supports es6 modules 
+        - node: var Greet = require('greet');
+        - es6/v8: import Greet from 'greet'
+
+
+EVENTS AND EVENT EMITTER
+
+    - event: something that has happened in our app that we can respond 
+    - node has 2 kinds of events:
+        - 1. SYSTEM EVENTS that come from libuv.cpp - events that come from the computer like handling networks, retrieving data from hard disk
+        - 2. CUSTOM EVENTS: regular js events 
+    - often times, libuv events are transformed into js events so that you can handle the system events using js
+    - js doesn't actually have the concept of events, it fakes it 
+
+    Events And Event Emitter Part I
+
+        - creating our own event emitter
+        - node event emitters follow the same idea as below: 
+
+        emiiter.js
+        ------------------------------------------------------------------------------
+            function Emitter() {
+                this.events = {};
+            }
+
+            Emitter.prototype.on = function(type, listener) {
+
+                // creates an array of listener functions that handle each event type
+
+                this.events[type] = this.events[type] || [];
+
+                this.events[type].push(listener);
+            }
+
+            Emitter.prototype.emit = function(type) {
+
+                // executes the listeners that are suppose handle the event type
+
+                if (this.events[type]) {
+                    this.events[type].forEach(function(listener) { listener(); });
+                }
+            }
+
+            module.exports = Emitter
+    
+        ------------------------------------------------------------------------------
+
+        app.js
+        ------------------------------------------------------------------------------
+            var Emitter = require('./emitter');
+
+            var emtr = new Emitter();
+
+            emtr.on('greet', function() { console.log('handler for greet #1'); });
+
+            emtr.on('greet', function() { console.log('handler for greet #2'); });
+
+            emtr.emit('greet');
+
+        ------------------------------------------------------------------------------
+
+    Events And Event Emitter Part II
+
+        - using events.js in the node lib
+
+        app.js
+        ------------------------------------------------------------------------------
+            var Emitter = require('event'); // instead of require('./emitter');
+
+            var emtr = new Emitter();
+
+            emtr.on('greet', function() { console.log('handler for greet #1'); });
+
+            emtr.on('greet', function() { console.log('handler for greet #2'); });
+
+            emtr.emit('greet');
+
+            //node works the same way!
+
+        ------------------------------------------------------------------------------
+
+        - this can be an issue because it uses magic strings, which is a code smell
+
+        - instead what you can do is:
+
+        config.js
+        ------------------------------------------------------------------------------
+
+            module.exports = {
+                events: {
+                    GREET: 'greet',
+                    FILE_SAVED: 'filesaved'
+                }
+            }
+
+        ------------------------------------------------------------------------------
+
+        app.js
+        ------------------------------------------------------------------------------
+            var Emitter = require('event'); // instead of require('./emitter');
+            var eventLabels = require('./config').events // centralize and variable-ized strings
+
+            var emtr = new Emitter();
+
+            emtr.on(eventLabels.GREET, function() { console.log('handler for greet #1'); });
+
+            emtr.on(eventLabels.GREET, function() { console.log('handler for greet #2'); });
+
+            emtr.emit('greet');
+
+            //node works the same way!
+
+        ------------------------------------------------------------------------------
+
+
+    Inheriting from Event Emitters
+
+        - util has a inherits method
+
+        app.js
+        ------------------------------------------------------------------------------
+            var Emitter = require('event'); // instead of require('./emitter');
+            var util = require('util') 
+
+            function Greetr() {
+                this.greeting = 'hello';
+            }
+
+            util.inherits(Greetr, Emitter);
+
+            Greetr.prototype.greet = function() { console.log(this.greeting); this.emit('greeting'); }
+
+            var greet = new Greet();
+
+            greet.on('greeting', function() { console.log('greeting handled'); });
+
+            //outputs: 'hello'\n'greeting handled'\n
+
+            // we can also do this to pass data to our event listeners:
+
+            Greetr.prototype.greet = function(data) { 
+                console.log(this.greeting);
+                this.emit('greeting', data); // passes arg to event listeners
+            }
+
+            greet.on('greeting', function(data) { console.log('greeting handled', ' ', data); });
+
+
+        ------------------------------------------------------------------------------
+
+    Inheriting from Event Emitters Part II
+
+        - what happens when we want to call the super's constructor?
+
+        app.js
+        -----------------------------------------------------------------------------
+            function Greetr() {
+                // we can do this
+                EventEmitter.call(this);
+                // or this: Greetr.super_.prototype.constructor(this); // this is more extensible
+                this.greeting = 'hello';
+            }
+
+        ------------------------------------------------------------------------------
+
+
+ASYNC CODE, LIBUV, THE EVENT LOOP, STREAMS, FILES, AND MORE ....
+
+    - js is "synchronous"
+    - nodejs is "async"
+    - v8 is "sync"
+
+    - callbacks: some code that you give other code to execute when that other code runs
+
+    Libuv, Event Loop, And Non Blocking Async Code
+        
+        - v8 interps js and runs one line at a time
+        
+        - system events are handled by another c++ library called libuv
+            - libuv makes requests to the OS for tasks like reading from disk, network, etc etc. this task is an event
+            - has a queue of events that have completed
+            - when the event is done, it gets placed on a queue
+            - libuv loops thru this queue for events that are done. THis is called the Event Loop
+
+            - when node executes a system event (e.g. fs.readFile):
+                1. a nodejs C++ function calls v8 to map the js system event call to libuv C++ function
+                2. libuv makes a request to the OS 
+                3. when the OS completes the request (now called event), it goes into libuv's event queue
+                4. the libuv's event loop sees the completed request in its queue, it returns the result to v8
+                5. v8 places the result onto its event queue
+                6. v8 executes that code and returns 
+
+                Node's own system events goes thru a process that follow libuv's event loop: https://nodejs.org/en/docs/guides/event-loop-timers-and-nexttick/
+                
+                src/unix/core.c - event loop:
+                    - note the uv__update_time -> uv__run_timers -> uv__run_idle -> uv__run_prepare ->  uv__io_poll -> uv__run_check -> uv__run_closing_handles
+                ------------------------------------------------------------------------------------------
+                    int uv_run(uv_loop_t * loop, uv_run_mode mode) {
+                        int timeout;
+                        int r;
+                        int ran_pending;
+
+                        r = uv__loop_alive(loop);
+                        if (!r)
+                            uv__update_time(loop);
+
+                        while (r != 0 && loop - > stop_flag == 0) {
+                            uv__update_time(loop);
+                            uv__run_timers(loop);
+                            ran_pending = uv__run_pending(loop);
+                            uv__run_idle(loop);
+                            uv__run_prepare(loop);
+
+                            timeout = 0;
+                            if ((mode == UV_RUN_ONCE && !ran_pending) || mode == UV_RUN_DEFAULT)
+                                timeout = uv_backend_timeout(loop);
+
+                            uv__io_poll(loop, timeout);
+                            uv__run_check(loop);
+                            uv__run_closing_handles(loop);
+
+                            if (mode == UV_RUN_ONCE) {
+                                /* UV_RUN_ONCE implies forward progress: at least one callback must have
+                                 * been invoked when it returns. uv__io_poll() can return without doing
+                                 * I/O (meaning: no callbacks) when its timeout expires - which means we
+                                 * have pending timers that satisfy the forward progress constraint.
+                                 *
+                                 * UV_RUN_NOWAIT makes no guarantees about progress so it's omitted from
+                                 * the check.
+                                 */
+                                uv__update_time(loop);
+                                uv__run_timers(loop);
+                            }
+
+                            r = uv__loop_alive(loop);
+                            if (mode == UV_RUN_ONCE || mode == UV_RUN_NOWAIT)
+                                break;
+                        }
+
+                        /* The if statement lets gcc compile it to a conditional store. Avoids
+                         * dirtying a cache line.
+                         */
+                        if (loop - > stop_flag != 0)
+                            loop - > stop_flag = 0;
+
+                        return r;
+                    }
+                ------------------------------------------------------------------------------------------
+
+        - non blocking: doing other things w/o stopping your program from running
+
+    Buffers and Streams
+
+        - Buffer: a temporary place to hold data before it gets moved else where
+        - stream: a sequence of data moving over time 
+
+        - often times a stream is gathered inside a buffer and then processed at once 
+
+    Binary Data, Encoding, Char Sets
+
+        - binary data: data represented as 1s and 0s 
+        - char set: a representation of chars as numbers (e.g. unicode)
+        - char encoding: how a char is transformed into numbers (e.g. utf8 uses 8 bits to represent characters, so we know that every 8 bits is a unicode character)
+
+    Node Buffers
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var buf = new Buffer('hello', 'utf8'); //we don't even need require!
+
+            console.log(buffer) // <Buffer 48 65 8c ... >
+
+            buf.toString();
+            buf.toJSON();
+
+            buf.write('wo'); //over-writes the first 2 chars of the buffer 
+
+        ------------------------------------------------------------------------------
+
+    Typed Arrays in ES6
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var buf = new ArrayBuffer(8); // create a 8 byte big buffer
+            var view = new Int32Array(buf) // create a typed array of 32 bit ints (new in es6) that is 8 bytes long so store 2 ints
+
+            view[0] = 10;
+            view[1] = 15;
+            view[2] = 6;
+
+            console.log(view) // logs [10,15] no 6 because buffer is full
+
+        ------------------------------------------------------------------------------
+
+
+    Files and fs
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var fs = require('fs');
+
+            var greeting = fs.readFileSync(__dirname + '/greet.txt', 'utf8'); //specify eencoding and directory 
+
+            console.log(greeting);
+
+            // readFileSync is synchronous which means it will wait until everything is read 
+            // however if many users are executing the same code, it may slow down others down
+
+            // we can do this async 
+
+            var greeting2 = fs.readFile(
+                __dirname + '/greet.txt', 
+                'utf8', 
+                function(err, data) { // this is called an error first callback: it is a callback function that takes an error as a first parameters
+                    console.log(data); 
+                }
+            );
+
+            // the data that is being read is in a buffer on the v8 heap, so we need to minimize the amount of heap space we are using
+
+        ------------------------------------------------------------------------------
+
+    Streams
+
+        - streams inherit from events.js
+        - there are many streams:
+            - Stream.Readable from '_stream_readable'
+            - Stream.Writeable from '_stream_writeable'
+            - etc etc
+
+        - Streams is an abstract class - a type of constructor that you never directly use, you only inherit from it becase it has methods that are never implemnted
+        - the readability and writeability of the stream is wrt Node: 
+            - e.g. a tcp connection might be duplex (both writeable and readable) but to node, the request is readable only and the response is writeable
+
+        - ReadStream implements Stream.Readable
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var fs = require('fs');
+
+            var readable = fs.createReadStream(__dirname + '/greet.txt', { encoding: 'utf8', highWaterMark: 32 * 1024 });
+
+            // readable inherits from events so we can use .on and we know that readable emits the 'data' event
+            
+            readable.on('data', function(chunk) {
+                console.log(chunk); //logs all of the data we are reading if we don't use highWaterMark. if we use highwatermark, stream will emit N number of data events with N being the amount of chunks are needed to read all of the data given the size 
+            });
+
+            var writeable = fs.createWriteStream(__dirname + '/greetCopy.txt');
+
+            readable.on('data', function(chunk) {
+                writeable.write(chunk); //writes to stream
+            });
+
+            // this allows to me handle my data in pieces
+
+        ------------------------------------------------------------------------------
+
+
+    Pipes
+
+        - connecting 2 streams by wriiting to one stream on what is being read from another
+
+        nodejs/lib/_stream_readable.js
+        -----------------------------------------------------------------------------
+
+            // reads from and writes to another stream
+
+            Readable.prototype.pipe = function(dest) { // takes a write stream as dest
+
+                ........
+
+                src.on('data', ondata);
+                function ondata(chunk) {
+                    debug('ondata');
+                    var ret = dest.write(chunk);
+                    debug('dest.write', ret);
+                    if (ret === false) {
+                        // If the user unpiped during `dest.write()`, it is possible
+                        // to get stuck in a permanently paused state if that write
+                        // also returned false.
+                        // => Check whether `dest` is still a piping destination.
+                        if (
+                            ((state.pipesCount === 1 && state.pipes === dest) ||
+                                (state.pipesCount > 1 && state.pipes.indexOf(dest) !== -1)) &&
+                            !cleanedUp
+                        ) {
+                            debug('false write response, pause', state.awaitDrain);
+                            state.awaitDrain++;
+                        }
+                        src.pause();
+                    }
+                }
+                 ........
+
+                 return dest // pipe function returns to us the stream where it wrote the stream to. allows us to chain pipes
+            }
+
+        ------------------------------------------------------------------------------
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var fs = require('fs');
+            var zlib = require('zlib'); // returns a library for creating gzips
+
+            var readable = fs.createReadStream(__dirname + '/greet.txt', { encoding: 'utf8', highWaterMark: 32 * 1024 });
+
+            // readable inherits from events so we can use .on and we know that readable emits the 'data' event
+            
+            readable.on('data', function(chunk) {
+                console.log(chunk); //logs all of the data we are reading if we don't use highWaterMark. if we use highwatermark, stream will emit N number of data events with N being the amount of chunks are needed to read all of the data given the size 
+            });
+
+            var writeable = fs.createWriteStream(__dirname + '/greetCopy.txt');
+
+            readable.pipe(writeable);  
+
+            // we can chain pipes 
+
+            var gzip = zlib.createGzip(); // returns to us a duplex stream that is redable and writeadble
+
+            readable.pipe(gzip).pipe(writeable);
+
+
+        ------------------------------------------------------------------------------
+
+        - NODE PREFERS STREAMS BECAUSE IT ALLOWS US TO BE SPACE EFFICIENT
+
+        - NODE PREFERS ASYNC CALLS CUZ THEY ARE TIME EFFICIENT
+
+
+    HTTP AND BEING A WEB SERVER
+
+        Http Parser
+
+            - http_parser is a C library that is used in Node to parse http reqs and reses
+
+        Building a web server 
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var http = require('http');
+
+            http.createServer(function(req, res) { // res is a stream that we write our response to 
+
+                // createServer is creates an event listener with this callback like http.on(...)
+                // the event that it listens on is emitted like .emit('request', req, res).
+                // that is why we have to handle req, res in our callback
+
+                res.writeHead(200, { 'Content-Type': 'text/plain' });
+                res.end('Hello World\n'); // last line of the response 
+
+                // where do we specify the port?
+
+            }).listen(1337, 'localhost') // createServer returns the server object which has a listen method that takes port: number, address: string
+
+
+        ------------------------------------------------------------------------------
+
+        Getting The Web Server To Return Static Html
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var http = require('http');
+            var fs = require('fs');
+
+            http.createServer(function(req, res) { 
+
+                res.writeHead(200, { 'Content-Type': 'text/html' }); // if we change the 'text/plain', the browser will just output the html file
+                
+                var html = fs.readFileSync(__dirname + '/test.html'); // this just gives you some binaries
+                
+                res.end(html); // last line of the response 
+
+            }).listen(1337, 'localhost') // createServer returns the server object which has a listen method that takes port: number, address: string
+
+
+        ------------------------------------------------------------------------------
+
+
+        Handling Html Templates
+
+        index.html
+        -----------------------------------------------------------------------------
+            <!DOCTYPE HTML>
+            <html>
+                <head></head>
+                <body>
+                    <h1>{Message}</h1>
+                </body>
+            </html>
+        ------------------------------------------------------------------------------
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var http = require('http');
+            var fs = require('fs');
+
+            http.createServer(function(req, res) { 
+
+                res.writeHead(200, { 'Content-Type': 'text/html' }); // if we change the 'text/plain', the browser will just output the html file
+                
+                var html = fs.readFileSync(__dirname + '/index.html', 'utf8'); //specified that you get a string
+
+                var message = 'Hello World';
+
+                html = html.replace('{Message}', message); // we can just use the .replace in js
+                
+                res.end(html); // last line of the response 
+
+            }).listen(1337, 'localhost') // createServer returns the server object which has a listen method that takes port: number, address: string
+
+        ------------------------------------------------------------------------------
+
+
+    How Can We Use Streams To Improve Space?
+
+        - the code we wrote above puts the html in a buffer before sending it out. If alot of people request this website, it will take alot of buffer space ..
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var http = require('http');
+            var fs = require('fs');
+
+            http.createServer(function(req, res) { 
+
+                // res is a streaam! so we can just write it to stream
+
+                res.writeHead(200, { 'Content-Type': 'text/html' }); // if we change the 'text/plain', the browser will just output the html file
+                
+                // first we can create a readstream using fs and then pipe what is read to the res writestream
+
+                fs.createReadStream(__dirname + '/index.html').pipe(res);
+
+            }).listen(1337, 'localhost');
+
+
+        ------------------------------------------------------------------------------
+
+    Sending JSON
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var http = require('http');
+            var fs = require('fs');
+
+            http.createServer(function(req, res) { 
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+
+                var obj = {
+                    test: 'hi',
+                    test2: 'bye'
+                };
+                
+                res.end(JSON.stringify(obj));
+
+            }).listen(1337, 'localhost');
+
+        ------------------------------------------------------------------------------
+
+    Routing
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var http = require('http');
+            var fs = require('fs');
+
+            http.createServer(function(req, res) { 
+
+                res.writeHead(200, { 'Content-Type': 'text/html' }); 
+
+                if (req.url === '/') {
+
+                    fs.createReadStream(__dirname + '/index.html').pipe(res);
+                } 
+                else if (req.url === '/api') {
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' }); 
+                    
+                    var obj = {
+                        test: 'hi',
+                        test2: 'bye'
+                    };
+                    
+                    res.end(JSON.stringify(obj));
+                }
+                else {
+
+                    res.writeHead(404);
+                    
+                    res.end();
+                }
+
+            }).listen(1337, 'localhost');
+
+        ------------------------------------------------------------------------------
+
+NODE PACKAGE MANAGER (NPM)
+
+    - npm is the largest repo of pakages ytd
+
+    Semantic Versioning (Semver)
+
+        - versioning actually conveys some meaning
+        - standard that ensures that versioning number allows users to decide if new version has breaking changes
+
+        - standard is major.minor.patch (e.g. 1.7.2)
+            - patch: increments the number if it was bug fix on existing code. No breaking changes
+            - minor: added new features; didn't break old ones; no breaking changes
+            - major: possible break of changes
+
+
+    Npm and the Npm Registry
+
+        - NPM Registry: where the packages are hosted
+
+    Init, Nodemon, Package.json Part I
+
+        - you need to setup a config so that you know what dependencies you are using. That is the package.json
+        - node_modules -- a folder that is created for your dependencies
+        - ^3.10.6 -- this means that your app accept all depdencies that are 3.x.x not 4.x.x or 2.x.x
+        - ~3.10.6 -- this means only 3.10.x is ok 
+        - we don't upload the node_modules/ to github
+
+    Init, Nodemon, Package.json Part II
+
+        - npm install <some-package> -g -- installs the package globally
+        - depenencies will have it's own depedencies 
+        - nodemon watches and hot loads the file 
+        - cli -- it means that it is used in thee commandline 
+
+
+    Using Express
+
+        - Express exports createApplication which returns a function called 'app' with a bunch of props and 
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var express = require('express');
+            var app = express();
+
+            // We can use environment vars to set port number. process.eenv allows us to access env vars in node
+            
+            var port = process.env.PORT || 3000
+
+            app.get('/', function(req, res) {
+
+                // no need to specify mime because express sets type for you
+
+                res.send('<!DOCTYPE HTML><html><head></head><body><h1>{Message}</h1></body></html>');
+            });
+
+            app.get('/api', function(req, res) {
+
+                res.json({test: "kjhkhk"});
+            });
+
+            app.listen(port);
+
+        ------------------------------------------------------------------------------
+
+    Routing with Express
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var express = require('express');
+            var app = express();
+
+            // We can use environment vars to set port number. process.eenv allows us to access env vars in node
+            
+            var port = process.env.PORT || 3000
+
+            app.get('/', function(req, res) {
+
+                // no need to specify mime because express sets type for you
+
+                res.send('<!DOCTYPE HTML><html><head></head><body><h1>{Message}</h1></body></html>');
+            });
+
+            // we can use the : which tells express to expect anything after those params
+
+            app.get('/person/:id', function(req, res) {
+
+                // when a request comes in, node will give express the url and express will parse the url and put anything after person/ into a js object called params where the key is the what the thing is called in this case id and the thing is the value
+                // so we can access soemthing like /person/156 as req.params.id and get 156
+                // we can even do /person/:id/page/:pageid and get req.params.pageid and req.params.id
+
+                res.send('<!DOCTYPE HTML><html><head></head><body><h1>Person ID: ' + req.params.id + '</h1></body></html>');
+            });
+
+            app.listen(port);
+
+        ------------------------------------------------------------------------------
+
+    Middlewares and Static Files
+
+        - Middleware: code that sits between 2 layers of software, e.g. express is a middleware that sits between the req and res
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var express = require('express');
+            var app = express();
+            
+            var port = process.env.PORT || 3000
+
+            // we want to deal with static files with middleware that maps a url to a middleware
+
+            app.use('/assets', express.static(__dirname + '/public')); // so everytime we see a request to /assets, express will go find the static file in public/ 
+
+            // we can even make our own middleware
+
+            app.use('/', function(res, res, next) {
+                // this middleware logs the request
+                console.log('request url: ', req.url);
+
+                next(); // calls the next middleware
+            });
+
+            app.get('/', function(req, res) {
+
+                res.send('<!DOCTYPE HTML><html><head><link href="/assets/styles.css" type="text/css"></link>head><body><h1>hi</h1></body></html>');
+            });
+
+            app.listen(port);
+
+        ------------------------------------------------------------------------------
+
+    Templating Engines
+
+        - you can specify templating engines in express via app.set('view engine' <name of engine>)
+
+        - let's use ejs ....
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var express = require('express');
+            var app = express();
+            
+            var port = process.env.PORT || 3000;
+
+            app.set('view engine', 'ejs'); // reads from all *.ejs
+
+            app.get('/person/:id', function(req, res) {
+
+                res.render('index', { id: req.params.id });
+            });
+
+            app.listen(port);
+
+        ------------------------------------------------------------------------------
+
+
+    Querystrings and Parameters
+
+        - POST method has content-type 'application/x-www-form-urlencoded' or 'application/json'
+            - Content-Type 'application/x-www-form-urlencoded' is basically a querystring in your POST body. Used for serializing forms with string data
+
+        - note that if you do <form method="GET" ... it will put the params of your form into the url instead of the body
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var express = require('express');
+            var bodyParser = require('body-parser'); //parses request bodies
+            var app = express();
+
+            var urlencodedParser = bodyParser.urlencoded({ extended: false}); // allows bodyparser to handle x-wwww-form-urlencoded
+            
+            var port = process.env.PORT || 3000;
+
+            app.set('view engine', 'ejs'); // reads from all *.ejs
+
+            app.get('/person/:id', function(req, res) {
+
+                //request puts all query params (i.e. everything that is like ?qstr=123&acd=123) into query and you get { qstr: '123', acb: '123'}
+                res.render('index', { id: req.params.id, qstr: req.query.qstr });
+            });
+
+            app.post('/person', urlencodedParser, function(req, res) {
+
+                // note that by putting the urlencodedParser as the 2nd arg in the .post, we are specifiying a middleware for just this .post
+
+                res.send('Thank you');
+
+                console.log(req.body.fn);  // note that bodyParser attaches the parsed body to the body attribute of the request object
+                console.log(req.body.ln);
+            });
+
+            app.listen(port);
+
+        ------------------------------------------------------------------------------
+
+
+    Structuring an Express App
+        - we can use express-generator an cli tool to create a structer for our app
+        - in express you can do something like:
+
+        user.js
+        -----------------------------------------------------------------------------
+
+            var express = require('express');
+            var router = express.Router();
+
+            router.get('/:id', function(req, res) { 
+                res.send('userId: req.params.id'); 
+            });
+
+            module.exports = router;
+
+        ------------------------------------------------------------------------------
+
+        app.js
+        -----------------------------------------------------------------------------
+
+            var express = require('express');
+            var app = express();
+            var user = require(./user);
+            
+            var port = process.env.PORT || 3000
+
+            app.use('/users', user); 
+
+            app.listen(port);
+
+        ------------------------------------------------------------------------------
+
+        - in the above we set the user/ url to be handled by a middleware which in our case is another express app
+        - in the above /user/:id would be handled by our /:id

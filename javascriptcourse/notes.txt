@@ -1,0 +1,765 @@
+- syntax parser: reads code and tells if the programming is valid
+- lexical environment: where you write something 
+- execution context: which lexical environment is currently running
+- global execution context: global object creates `this` or window in browser 
+- global: not inside a function
+- global execution context in created in 2 phases:
+    - 1. creation phase: global object, this, outer environment. Parser runs through your code and sets memory aside for variables and functions (i.e. HOISTING). But no assignments are set. 
+    - ALL variables in javascript are set to undefined initially and all functions are set in its entirety
+    - 2. execution phase: executes code line by line
+- not defined vs undefined:
+    - undefined: a special value in javascript meaning that the value of something is not set
+    - not defined: an error that says there is no memory space set for a variable 
+    - undefined takes up memory space. So, never do this: `var a = undefined`
+    - so undefined just means i never set this value
+- single threaded within the same execution context
+- synchronous: executed one line at a time
+- what will happen with this:
+---------------------
+function b() {              1. global execution will be created in 2 phases:
+                               - creation phase: creates this, window, hoisting
+}                              - execution phase: runs line by line 
+           
+function a() {                    
+ b()                        2. in the execution phase:
+}                                -  creates another execution context (goes through the two phases) which goes through and puts it  on the execution stack for a()
+a()                         3. in a()'s execution phase, b() will be invoked and that will create another execution context for b() and another execution context will be placed ontop of the execution stack
+---------------------       4. when b() is finished, it gets popped off the stack
+                            5. where the code gets placed doesn't alter what is actively executed because everything is already setup in the creation phase
+- variable environment: where the var lives and how they relate to each other in memory
+- what is the value of myVar?:
+function b() {    1. myVar is created in the global execution context and set to 1
+    var myVar;    
+}                 2. myVar is created in a() execution context and is set to 2
+function a() {    3. myVar is created in b() "   " and set to undefined
+    var myVar = 2;
+    b();
+}
+var myVar = 1;      - scope: where are we able to see the variable
+a();                - each myVar is defined in it's own execution context
+Scope Chain
+    - what is the value of myVar when you log it in b:
+    ----------------------------------
+    function b() {              - gec sets myVar to 1, a's context set it to 2
+        console.log(myVar);     - every context references it's outer environment  
+    }                           - in the context's execution phase, js creates the outer env reference based on where the code is written (i.e. where the function was declared i.e. the function's lexical environment). Since b was declared in the global env, it's outer env is the global context 
+    function a() {              - so if myVar is not defined in b's context, it will look for it in outer env and then that outer env's outer  env  until it finds it
+                                - this is called the SCOPE CHAIN  
+        var myVar = 2;          - so the value of myVar is 1 because b's outer environment is the global execution context
+        b();                      
+    }
+    var myVar = 1;              
+    a();      
+    -----------------------------------
+    Scope - where a variable is available in your code and if it's truly the same variable or a new copy
+    Let - allows the js to use block scoping:
+        - BLOCK SCOPING: when the variable is declared, memory is set aside for the variable in the creation phase, but you are not allowed to use the variable until it's assignment is executed given it is in the block variable is only allowed to be used in the block that it is declared
+        
+    --------------------------------------------
+        console.log(c); <-- produce undefined
+        let c = 1;
+    -------------------------------------------- 
+        if(1>0) {
+            let c = 1;
+        }
+        console.log(c); <-- produce error because using variable outside of the block
+    --------------------------------------------
+        if(1>0) {
+            var c = 1;
+        }
+        console.log(c); <-- produce 1 because using variable in the same lexical environment
+    --------------------------------------------
+        if(1>0) {
+            console.log(c)  <-- produce error because using variable before assignment
+            let c = 1;
+        }
+    ----------------------------------------------
+        if(1>0) {
+            console.log(c)  <-- produce undefined because using variable before assignment
+            var c = 1;
+        }
+    ----------------------------------------------
+    - when using let in a for loop, a new variable is created with each execution of the loop
+Async callbacks 
+    - code that is executing at the same time
+    - javascript engine itself runs sync but it has hooks into other stuff (within the browser) to talk to other parts of the browser (e.g. parts that make network calls, renders webpage). These calls are async
+    - function calls are placed on the execution stack. 
+    - notifications of events (i.e. events that need the javascript code to respond to) are placed on the event queue.
+    - engine first executes stack and empties the stack before it looks at the queue
+    - in the queue:
+        1. js looks at the event
+        2. sees if a execution context needs to be created and exceuted for the event
+        3. if yes, creates a stack and executes it for event 
+        4. dequeues and then moves on
+    - in this sense, js is not async, it's just the browser/engine that puts events on the queue aynchronously for the js engine to execute it
+    - REMEMBER: the stack always finishes before it looks at the queue
+Js types 
+    - dynamic typing: you don't tell the engine what of data to hold, the engine just infers based on the assignment
+    - primitive type: is a single value (i.e. not an object)
+    6 primitive types:
+        1. undefined - no value assigned to var
+        2. null - var has no value but is assigned
+        3. boolean
+        4. floating number
+        5. string - either '' or ""
+        6. Symbol - unique variable in the engine
+Operators
+    - A special function that is syntax different from the rest of your code
+    - e.g. 3 + 4 is a function call like add(3, 4) but called in a infix notifications
+    - Operator precedence:
+        - which operatror gets called first 
+    - operator associativity
+        - which operator gets called first if they have the same precedence 
+        - e.g. 3 + 4 * 5
+            - precedence: * has higher precedence than + so 4 * 5 gets calculated first then 3 + ...
+---------------------------------------------------------------
+    var a= 1, b=2, c=3
+    a = b = c
+    what;s the value of a,b,c? all 3 cuz = operators goes right to left associativity so all letters get the value of the rightest var which is c
+------------------------------------------------------------------
+Coersion
+    - changing a value from one type to another 
+    - what is a? var a = 1 + '2'; a = 12. The engine opts to change the 1 to a string
+Logical operations:
+    what does this produce? 1 < 2 < 3 => true
+        - associativity of < is left to right
+        - so will compute 1 < 2 first and it produces true
+        - then true < 1
+        - false gets coerced to 0 in < operation (cuz it operates on numbers)
+        - so false < 1 becomes 0 < 1
+        - 0 < 1 makes true
+    what does this produce? 3 < 2 < 1 => true why?
+        - associativity of < is left to right
+        - so will compute 3 < 2 first and it produces false
+        - then false < 1
+        - false gets coerced to 0 in < operation (cuz it operates on numbers)
+        - so false < 1 becomes 0 < 1
+        - 0 < 1 makes true
+    - Can you not coerce values?
+      - == or != 
+        - coerce values first then compare so '3' == 3 => true
+            - false == 0 => true cuz false coerces to 0
+            - null == 0 => false cuz null although in some circumstances coerces to 0, it doesn't in the case of ==
+      - === or !==
+        - does not coerce before compare
+        - false === 0 is false cuz of diff types 
+    - existence and bools
+        - Boolean('') => false
+        - Boolean(undefined) => false 
+        - Boolean(null) => false 
+        - Boolean(0) => false --- tricky: because 0 doesn;t mean something doesn't exist
+    - what will this produce:
+-------------------------------------------------------
+        var a = 0;        - precedence: === is before || so a === 0 gets computed first and that returns true
+        a || a === 0      - coersion: a || true => a which is 0 is coerced to false and false || true makes true
+-------------------------------------------------------
+Default values:
+    what does this produce?
+----------------------------------------------------------
+    function greet(name) {
+        console.log('Hello ' + name)    - makes 'Hello undefined' because name was never defined 
+    }                                   - what does undefined || 'hello' return? it's 'hello' cuz the || operator returns the first value that can be coerced to true
+    greet()
+-------------------------------------------------------------
+Framework aside:
+    what happens here?
+    index.html
+    ------------------------------
+    <head>
+        <script src='lib1.js'>
+        <script src='lib2.js'>
+    </head>
+    <body></body>
+    lib1.js
+    ------------------------------
+    var test = 'hi';
+    lib2.js
+    ------------------------------
+    var test = 'bye';
+    when the browser renders this it will combine all the js files into 1 file so the value of test in lib1.js will be overrided by lib2.js because lib2.js is after lib1.js
+    how to stop this?
+    - i can check to see if test already exists
+    - i can do this in lb2.js: window.test = window.test || 'bye'; this checks for the test variable is already there
+
+OBJECTS AND FUNCTIONS
+    - Object 
+        - collection of values with names
+        - what values?
+            - property:
+                - primitive (e.g. number, bool)
+                - another object
+            - method:
+                - function
+        - have references to the memory addresses of its methods and properties
+    ------------------------------
+    var person = new Object()
+    person['firstname'] = 'Tony' ([] computed member access operator)
+    ------------------------------
+    var person = new Object()
+    person.firstname = 'Tony' (. member access operator)
+        - parser actually turns the firstname into string and makes it person['firstname']
+        - . operator is preferred to []
+    ------------------------------
+    Object literals
+        - declaring an object literal:
+        ------------------------------
+        var person = {}
+        ------------------------------
+    Faking Namespaces
+        - Namespace - a container for variables and functions. Typically to keep names and functions seperate in code
+        - objects can fake namespaces in javascript
+        ------------------------------
+        var greet = 'hi';
+        var greet = 'ni hao';
+        // the latter greet will override the most top greet
+        // putting them in objects
+        var eng = {}
+        eng.greet = 'hi';
+        ch.greet = 'ni hao';
+        // this will throw uncaught cannot set prop greet of undefined
+        eng.greetings.greet = 'hi';
+        //greeting is not variable sinside eng so . will return undefined 
+        ------------------------------
+    Functions are Objects
+        - First class functions: everything you can do with other types, you can do with functions (e.g. assign to vars)
+        - function is a sepcial object:
+            - has primitives, can add new properties (i.e. key value pairs to it, including other functions)
+            - has 2 special property:
+                1. name
+                2. code - is invocable (i.e. can be interpreted and parsed to create executed in the engine)
+    Function Statement vs Expressions
+        -  Expression - unit of code that results in a value
+            - e.g. a = 3, 1 + 2
+        - Statement - unit of code that doesn't return value
+            - e.g. if (a === 3) { ... } <-- if doesn't return anything 
+        
+        - function declaration is a statement:
+            function greet() {  - the name property of the function is set to 'greet'
+                ....
+            }
+        - function declaration as a expression:
+            var aFunc = function() {    - the name of the function is not set
+                ....                    - anonymous function, but has a variable that points to where the function lives in memory
+            }
+        - what wil happen here:
+        -------------------------------------------------
+            aFunc()
+            var aFunc = function() { ... }
+            gives undefined error when invoking aFunc because variables even assigned to function is hoisted to become undefined
+        -------------------------------------------------
+        - what wil happen here:
+        -------------------------------------------------
+            function log(a) { console.log(a); }
+            log(function() { console.log('hi'); }) - console.logs the functions because function are just objects. This is like creating an oject literal
+            
+            function run(a) { a(); } 
+            run(function() { console.log('hi'); }) - runs the function passed into it
+        -------------------------------------------------
+    Pass by value vs Pass by reference
+        - pass by value: when doing something like b = a, the contents of what is in the memory address that pointer a is referencing is copied into the memory address that pointer b is referencing (Java)
+        - pass by reference: "                         ", the memory address that a is pointing to is given to b so that a and b point to the same memory address
+        - Javascript pass primitives BY VALUE
+        - Javascript passes objects BY REFERENCE (including Arrays)
+        - mutate: to change something
+        - immutable: something that cannot be changed
+    Objects, Functions, this
+        - execution context is how code in a function object is run. It has:
+            - variable environment: where the variable within the context lives
+            - outer environment: where the variable outside of the context lives (i.e. the scope chain)
+            - the keyword this:
+                - points to a certain object depending on how the function is invoked
+                - in browser: 'this' references the wiwndow object
+            -------------------------------------------------
+               function a() { console.log(this); }
+               a() 
+               // console logs window (i.e. the global object)
+               // how about log, a method in an object
+               var c = {
+                    name: 'the c object',
+                    log: function() { console.log(this); }
+               }
+               c.log() // logs object c. 'this' is pointing to object c, since log is a method of c
+               // alot of people say this is a bug
+               var c = {
+                    name: 'the c object',
+                    log: function() { 
+                            console.log(this);
+                            this.name = 'updated c';
+                            // nested function 
+                            function sestname(newname) {
+                                this.name = newname;
+                            }
+                            setname('updated c again');
+                        }
+               }
+               c.log() //Expected: 'this' inside setname will still point to c since it is inside a method in c
+                        // Actual: 'this' inside nested function inside another function points to the global object
+                /*
+                    why??
+                    function a(arg1) { .... }
+                    a(param1) => a.call(undefined, param1)
+                    var test = { a: function(arg1) {....} }
+                    test.a(param1) => a.call(test, param1)
+                    when invoking a func via .call( ... ) the first param, thisArg, is what the keyword this gets assigned. When it's undefined in the case of a(param1) => a.call(undefined, param1), it's set to the global object.
+                    https://stackoverflow.com/questions/9644044/javascript-this-pointer-within-nested-function
+                */
+            FIX:
+               var c = {
+                    name: 'the c object',
+                    log: function() { 
+                            console.log(this);
+                            this.name = 'updated c';
+                            var objc = this;  // objc is now referencing this in log
+                            // nested function 
+                            function sestname(newname) {
+                                objc.name = newname; // we are using objc
+                            }
+                            setname('updated c again');
+                        }
+               }
+            ------------------------------------------------- 
+    Arrays:
+        - collections of anything
+        - javascript is dynamically typed so mupltiple different types can exist in the same array 
+    'arguments' Keyword and Spread
+        - keyword that holds the params that you pass into a function
+        -------------------------------------------------
+            function greet(first, last, lang) {
+                console.log(first);
+                console.log(last);
+                console.log(lang);
+            }
+            greet() // prints undefined, undefined, undefined because hoisting already created mem space for params in execution
+                    // many other languages would give you an error
+            function greet(first, last, lang) {
+                console.log(arguments)
+            }
+            greet('john', 'doe', 'english') // prints ['john, 'doe', 'english'] because arguments is Array like structure
+            // NOTE: 'arguments' is not an Array
+        -------------------------------------------------
+    
+    Function overloading
+        - when you have 2 functions of the same name that take different amount of parameters
+        - in javascript you can't do that but you can create additional functions that call another function
+
+
+    Syntax Parser
+        - reads your code and determines if it's valid 
+        - reads your code character by character 
+
+
+    Automatic semicolon insertion
+        - syntax parser in js inserts semicolons automatically
+        - carraige return is automatically followed by semicolons in the syntax parser 
+        - CAN BE BIG PROBLEM:
+        -------------------------------------------------
+            function getPerson() {
+                return
+                {
+                    firstname: 'test'
+                }
+            }
+
+            // the above function returns undefined because it inserts a ; after the return
+        -------------------------------------------------
+
+    Whitespaces
+        - invisisble chars like carraige return, ' ', tab, etc etc
+        - js is very liberal about this 
+        -------------------------------------------------
+
+        var 
+
+        // this is ok in js
+        firstname,
+
+        // this is also ok
+        lastname;
+
+        var test {
+            //firstname
+            firstname: 'test',
+
+
+                //this is ok
+                lastname: 'test'
+        };
+
+        -------------------------------------------------
+
+    Immediately INvoked Function Expression (IIFE)
+
+        -------------------------------------------------
+
+
+        //immediately invoking function expression
+        var greeting = function(name) {
+            return 'hi ' + name;
+        }('test');
+
+        console.log(greeting); // greeting is 'hi test'
+
+        3; // this is ok
+        'I am a string'; // this is ok
+
+        //what about this?
+        function(name) {
+            return 'hi ' + name;
+        } // this is invalid because the syntax parser expects a name for the function
+
+        // but this works
+        // js expects anything in the brackets to be an expression so it thinks the function is an expression
+        (function(name) {
+            return 'hi ' + name;
+        })
+
+        // you can also invoke it
+        (function(name) {
+            console.log('inside IIFE', ' ', name);
+        }('john'))
+
+        //logs 'inside IIFE name'
+
+        // this also works
+        (function(name) {
+            console.log('inside IIFE', ' ', name);
+        })('john') // can invode the IIFE outside the brackets
+
+        -------------------------------------------------
+
+    IIFE and Safe Code
+
+        -------------------------------------------------
+
+            (function(name) {               // gec created first when executing this IIFE
+                var greeting = 'hola ';     // the function is in the gec
+                console.log(greeting, name) // executing the function creates another execution context in it's own execution context
+            }('John'))                      // very useful because it isolates variables and functions from other vars in the global context
+
+            index.html
+            ------------------------------
+            <head>
+                <script src='lib1.js'>
+                <script src='lib2.js'>
+            </head>
+            <body></body> 
+            
+
+            lib1.js
+            ------------------------------
+            var greeting = 'bye';
+
+
+            lib2.js
+            ------------------------------
+            (function(name) {               // in lib1, greeting is the global namespace
+                var greeting = 'hola ';     // lib2's greeting doesn't override lib1's because it's in a different execution context
+                console.log(greeting, name) 
+            }('John'))
+
+
+
+            lib2.js
+            ------------------------------
+            (function(global, name) {          // in this case, lib2 will override the global namespace because we passed 'window' into the IIFE
+                var global.greeting = 'hola ';     
+                console.log(greeting, name) 
+            }(window, 'John'))
+
+        -------------------------------------------------
+
+
+    Closures: Part I
+        -------------------------------------------------
+
+            function greet(whattosay) {
+
+                return function(name) {
+                    console.log(whattosay, ' ', name);
+                }
+            }
+
+            var sayHi = greet('hi');
+            sayHi('Tony'); //logs 'hi Tony'
+
+            // How does sayHi know what whattosay param is??
+            // var sayHi = greet('hi'); <-- creates an execution context when executing greet. When greet return the execution context is popped off the stack. BUT it retains the param, whattosay (in this case 'hi')
+            // sayHi('Tony'); <- creates another execution context, but this context has a reference to it's outer environment and can still reference whattosay. THIS IS CALLED CLOSURES
+
+        ------------------------------------------------- 
+
+
+
+    Closures: Part II
+        -------------------------------------------------
+
+            function buildFunctions() {
+
+                var arr = [];
+
+                for(var i=0; i < 3; i++) {
+                    arr.push(function() { console.log(i); });
+                }
+
+                return arr;
+            }
+
+            var fs = buildFunctions();
+
+            fs[0](); 
+            fs[1]();
+            fs[2]();
+
+            // logs all 3's cuz i is mutated and they all reference the same i
+
+            // but if it's a let it's gonna be 0,1,2
+
+            // OR
+
+            function buildFunctions() {
+
+                var arr = [];
+
+                for(var i=0; i < 3; i++) {
+                    arr.push(
+                        (function(j) { 
+                            return function() { console.log(j); } 
+                        }(i)); // closure closes over the param j which holds what i is at that moment 
+                }
+
+                return arr;
+            }
+
+            var fs = buildFunctions();
+
+            fs[0](); 
+            fs[1]();
+            fs[2]();
+
+        ------------------------------------------------- 
+
+    Function Factory with Closures
+
+        -------------------------------------------------
+
+            function greeting(language) {
+
+                return function(fname) { 
+
+                    if (language === 'en') {
+                        console.log('hi', ' ', fname);
+                    if (language === 'es') {
+                        console.log('hola', ' ', fname);
+                };
+
+            }
+
+            var engreeting = greeting('en');
+            var esgreeting = greeting('es');
+
+            esgreet('john'); //logs 'hola john'
+            engreet('john'); //logs 'hi john'
+
+            // greeting is a factory
+
+        ------------------------------------------------- 
+
+
+    Async + Callbacks (cb) + Closures
+
+        ------------------------------------------------------
+
+            function sayHiLater() {
+                 var greeting = 'Hi';
+
+                 setTimeout(function() {
+                    console.log(greeting);
+                 }, 3000);
+            }
+
+            sayHiLater();
+
+            // sayHiLater has already been popped off the execution stack when the timeout cb is gonna been invoked on the event loop. Yet, the cb still has access to greeting
+
+            // What is a cb? a function A that is given to another function B such that B invokes A when it finishes executing
+
+        ------------------------------------------------------
+
+
+    Call(), Apply(), Bind()
+
+        - bind: returns a function that can bind:
+            1. 'this' keyword in the function to any object you want (e.g. somefunction.bind(someobject))
+
+        -  call: invokes a function that can bind:
+            1. 'this' keyword
+            2. some list of params (e.g. somefunction.bind(someobject, param1, param2))
+
+        - apply: like call but takes params as array
+
+        - function currying: creating a copy of a function with preset params
+        ------------------------------------------------------
+
+            function multiply(a,b) {
+                return a * b;
+            }
+
+            var multiplyBy2 = multiply.bind(this, 2); 
+
+            var result = multiplyBy2(4); // 8
+
+        ------------------------------------------------------
+
+    Functional Programming 
+
+        - programming with pure functions -- only viable if you have first class functions (functions you can pass around like variables)
+
+
+OOP & PROTOTYPAL INHERITANCE
+
+    - one entity (class, interface, etc etc) gets access to the properties & methods of another entity
+    
+    - Classical inheritance:
+        - verbose 
+        - complicated
+
+    - Prototypal inheritance:
+        - simple & flexible
+
+
+    Understanding the Prototype
+        - all objects have a reference to 'proto', another object
+        - given obj with property prop1, you can access like obj.prop1
+        - but if you have a prop2 inside the proto, you can still have access to the prop via ob1.prop2
+        - obj1's proto can have another proto that have prop3 and obj1.prop3 works
+        - obj2 can point to obj1's proto so that obj2.prop1 would work 
+
+        - if an obj doesn' have property, it will go up the proto chain until it finds that property
+
+        ------------------------------------------------------
+
+            var person = {
+                fname: ' ',
+                lname: ' ',
+                getFullName: function() {
+                    return this.fname + ', ' + this.lastname;
+                }
+            };
+
+            var john = { fname: 'john', lname: 'doe' };
+
+            // Terrible code that degrades performance
+
+            john.__proto__ = person; // now john has access to getFullName 
+            
+            var fullName = john.getFullName();
+
+            console.log(john.fname); // why does this print 'john' instead of ''?? because js found the fname property in john without going up the proto chain to person
+
+            var jane = { fname: 'jane' };
+
+            jane.__proto__ = person;
+
+            console.log(jane.getFUllName()); // logs 'jane ' because jane doesn't have lname
+        --------------------------------------------------------
+
+
+    Everything is an Object or primitive
+        
+        ------------------------------------------------------
+
+            var a = {};
+            var b = function() {};
+            var c = []
+
+            a.__proto__ // prints Object {} which is the base Object, everything in js inherits from the base object. proto has toString 
+            b.__proto__ // prints function Empty() {} which is the base Function, that has call(), bind(), apply(), etc etc
+            c.__proto__ // prints [] which is the base Array
+
+            c.__proto__.__proto__ // prints Object {}
+            B.__proto__.__proto__ // prints Object {}
+
+        --------------------------------------------------------
+
+    Reflection and Extend
+
+        - reflection: an object can look at itself, listing, and changing it's own properties
+
+        ------------------------------------------------------
+
+            var person = {
+                fname: ' ',
+                lname: ' ',
+                getFullName: function() {
+                    return this.fname + ', ' + this.lastname;
+                }
+            };
+
+            var john = { fname: 'john', lname: 'doe' };
+
+            // Terrible code that degrades performance
+
+            john.__proto__ = person; // now john has access to getFullName 
+
+            for(var prop in john) {
+                console.log(prop + ': ' + john[prop]); // prints all properties on the object and the proto chain
+
+                if(john.hasOwnProperty(prop)) 
+                    console.log(prop + ': ' + john[prop]) // only prints properties that are not on the proto
+            }
+            
+            var fullName = john.getFullName();
+
+            console.log(john.fname); // why does this print 'john' instead of ''?? because js found the fname property in john without going up the proto chain to person
+
+        --------------------------------------------------------
+
+ODDS AND ENDS
+
+    Typeof, Instanceof, Figuring Out What Something Is
+        ------------------------------------------------------
+
+
+            var a = 3;
+            console.log(typeof a); // number NOT Number; primitive is lower case
+
+            var d = [];
+            console.log(typeof d); // [object ] weird cuz the array is an object ...
+            console.log(d.toString()) // ' ' weird cuz the array is changed to empty string
+            console.log(Object.prototype.toString.call(d)) //gives you [object Array] better
+
+            function Person(lname, fname) {
+                this.lname = lname;
+                this.fname = fname;
+            }
+
+            var john = new Person('john', 'doe');
+            console.log(typeof john) //object 
+            console.log(john instanceof Person) //true goes thru the proto chain until it finds the object on the right hand side
+
+
+            console.log(typeof Person) //function
+
+        --------------------------------------------------------
+
+
+    Strict Mode
+        - to process the code in a stricter way
+        - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Strict_mode
+        - can't do things like: x or function(a, a, c) { return a + a + c; }
+        - can run a function in 'use strict' without the whole file
+        - in js, when multiple js files get concatted together, if the first file has use strict, they all would have use strict
+
+
+LEARNING FROM OTHER FRAMEWORKS
+    
+    Deep Dive into Jquery Pt 1
+        - jQuery.fn = jQuery.prototype = // this part of the jquery code shows that the $.fn is just the $'s prototype
+
+    Deep Dive into Jqueru Pt 3
+        - how does jquery to method chaining? eg. $(document).addClass('newclass').removeClass('newclass')
+            - it calls "return this" after every method 
+
+
+
+
